@@ -4,48 +4,93 @@
 # @github.com/amekusa/chores.sh
 #
 
-_main() {
-	if [ $# = 0 ] || [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
-		local exec="$(basename $0)"
+_main() (
+	shopt -s dotglob nullglob # glob options
+
+	local this="${BASH_SOURCE[0]##*/}"
+	local this_dir="$(dirname "${BASH_SOURCE[0]}")"
+	local answer
+
+	if [[ $# = 0 || "$1" = "--help" || "$1" = "-h" ]]; then
 		cat <<- EOF
-		$exec
+		$this
 		Extracts an archive.
 
 		Usage:
-		  $exec <archive>
+		  $this <archive>
 
 		EOF
 		return 1
 	fi
+
 	local src="$1"
-	if [[ ! "$src" =~ ^(.+)(\.(zip|7z|rar|tar\.t?(gz|xz|bz2?))) ]]; then
+	if [[ ! -e "$src" ]]; then
+		printf "[Error] No such file as '%s'.\n" "$src" >&2
+		return 1
+	fi
+	if [[ ! -f "$src" ]]; then
+		printf "[Error] Invalid file: '%s'.\n" "$src" >&2
+		return 1
+	fi
+	if [[ ! "$src" =~ ^(.*[^/])(\.(zip|7z|rar|tar\.t?(gz|xz|bz2?)))$ ]]; then
 		printf "[Error] Unsupported file: '%s'.\n" "$src" >&2
 		return 1
 	fi
-	local dst="${BASH_REMATCH[1]}"
 	local ext="${BASH_REMATCH[3]}"
+	local dst="${BASH_REMATCH[1]}"
+	local dst_dir="$(dirname "$dst")"
 
-	printf "Extracting...\n"
-	printf "> src: '%s'\n" "$src"
-	printf "> dst: '%s'\n" "$dst"
+	# create tempdir ('X's are replaced with random chars)
+	local temp; temp="$(mktemp -d "$dst_dir/.extract_XXXXXXXXXX")" || {
+		printf "[Error] Failed to create temporary directory.\n" >&2
+		return 1
+	}
 
-	if [ -a "$dst" ]; then
-		if [ -d "$dst" ]; then
-			printf "Destination directory already exists.\n"
-			while true; do
+	# delete tempdir on exit
+	trap 'rm -rf -- "$temp"' EXIT
+
+	# extract into tempdir
+	printf "Extracting '%s'...\n" "$src"
+	if ! case "$ext" in
+		tar.*) tar xf "$src" -C "$temp" ;;
+		zip)   unzip "$src" -d "$temp" ;;
+		rar)   unrar x "$src" "$temp" ;;
+		7z)    7z x "$src" -o"$temp" ;;
+	esac; then
+		printf "[Error] Failed to extract '%s'.\n" "$src" >&2
+		return 1
+	fi
+	local result="$temp"
+	local results=("$temp"/*)
+
+	# if the result is only one top-level directory
+	if [[ ${#results[@]} -eq 1 && -d "${results[0]}" && ! -L "${results[0]}" ]]; then
+		result="${results[0]}"
+		dst="$dst_dir/${results[0]##*/}"
+	fi
+
+	# check destination
+	local merge=false
+	while true; do
+		if [[ -e "$dst" ]]; then
+			if [[ -d "$dst" ]]; then
+				if [[ -L "$dst" ]]
+					then printf "Destination already exists (symlink): '%s'.\n" "$dst"
+					else printf "Destination already exists: '%s'.\n" "$dst"
+				fi
 				local answer
-				read -n 1 -p "Delete and recreate '$dst'? [Y/N/C] " answer; echo
+				read -n 1 -p "Choose action: [D]elete / [M]erge / [C]ancel > " answer || answer=C; echo
 				case "$answer" in
-				[Yy])
-					if ! rm -rf "$dst"; then
+				[Dd])
+					if ! rm -rf -- "$dst"; then
 						printf "[Error] Failed to delete '%s'.\n" "$dst" >&2
 						return 1
 					fi
 					printf "Deleted '%s'.\n" "$dst"
 					break
 					;;
-				[Nn])
-					:
+				[Mm])
+					merge=true
 					break
 					;;
 				[Cc])
@@ -53,40 +98,50 @@ _main() {
 					return 1
 					;;
 				*)
-					printf "Answer with Y, N or C.\n"
+					printf "Answer with D, M or C.\n"
 					;;
 				esac
-			done
-		else
-			printf "[Error] Destination path already exists: '%s'.\n" "$dst" >&2
-			return 1
-		fi
-	fi
-	if ! mkdir -p "$dst"; then
-		printf "[Error] Failed to create '%s'.\n" "$dst" >&2
-		return 1
-	fi
-	printf "Created '%s'.\n" "$dst"
+			else
+				printf "[Error] Destination already exists (non-directory): '%s'.\n" "$dst" >&2
+				return 1
+			fi
 
-	if ! case "$ext" in
-		tar.*) tar xf "$src" -C "$dst" ;;
-		zip) unzip "$src" -d "$dst" ;;
-		rar) unrar x "$src" "$dst" ;;
-		7z) 7z x "$src" -o"$dst" ;;
-	esac; then
-		printf "[Error] Failed to extract '%s'.\n" "$dst" >&2
-		return 1
+		elif [[ -L "$dst" ]]; then
+			printf "[Error] Destination already exists (deadlink): '%s'.\n" "$dst" >&2
+			return 1
+
+		else
+			break
+		fi
+	done
+
+
+	if $merge; then
+		rsync -a -- "$result/" "$dst" || {
+			printf "[Error] Failed to merge the result into '%s'.\n" "$dst" >&2
+			return 1
+		}
+	else
+		mv -- "$result" "$dst" || {
+			printf "[Error] Failed to move the result to '%s'.\n" "$dst" >&2
+			return 1
+		}
 	fi
 
 	printf "Extraction complete.\n"
-	printf "> src: '%s'\n" "$src"
-	printf "> dst: '%s'\n" "$dst"
+	printf "* src: '%s'\n" "$src"
+	printf "* dst: '%s'\n" "$dst"
 
 	while true; do
-		read -n 1 -p "Copy '$dst' to clipboard? [Y/N] " answer; echo
+		local answer
+		read -n 1 -p "Copy the destination to clipboard? [Y/N] > " answer || answer=N; echo
 		case "$answer" in
 		[Yy])
-			"$(dirname $0)/cb" "$dst"
+			"$this_dir/cb" "$dst" || {
+				printf "[Error] Failed to copy '%s' to clipboard.\n" "$dst" >&2
+				return 1
+			}
+			printf "Copied '%s' to clipboard.\n" "$dst"
 			break
 			;;
 		[Nn])
@@ -98,7 +153,7 @@ _main() {
 			;;
 		esac
 	done
-}
+)
 
 _main "$@"
 
