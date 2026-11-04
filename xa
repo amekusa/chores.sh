@@ -114,7 +114,6 @@ _main() (
 		fi
 	done
 
-
 	if $merge; then
 		rsync -a -- "$result/" "$dst" || {
 			printf "[Error] Failed to merge the result into '%s'.\n" "$dst" >&2
