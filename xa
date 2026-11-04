@@ -9,7 +9,6 @@ _main() (
 
 	local this="${BASH_SOURCE[0]##*/}"
 	local this_dir="$(dirname "${BASH_SOURCE[0]}")"
-	local answer
 
 	if [[ $# = 0 || "$1" = "--help" || "$1" = "-h" ]]; then
 		cat <<- EOF
