@@ -127,8 +127,8 @@ _main() (
 	fi
 
 	printf "Extraction complete.\n"
-	printf "* src: '%s'\n" "$src"
-	printf "* dst: '%s'\n" "$dst"
+	printf " - src: '%s'\n" "$src"
+	printf " - dst: '%s'\n" "$dst"
 
 	while true; do
 		local answer
