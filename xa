@@ -136,7 +136,7 @@ _main() (
 		case "$answer" in
 		[Yy])
 			"$this_dir/cb" "$dst" || {
-				printf "[Error] Failed to copy '%s' to clipboard.\n" "$dst" >&2
+				printf "[Error] Failed to copy '%s' to clipboard.\n" "'$dst'" >&2
 				return 1
 			}
 			printf "Copied '%s' to clipboard.\n" "$dst"
