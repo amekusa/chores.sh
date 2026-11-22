@@ -16,17 +16,36 @@ _main() {
 		EOF
 		return 1
 	fi
-	if command -v "pbcopy" &> /dev/null; then # mac
-		printf "$*" | pbcopy
-	elif command -v "xclip" &> /dev/null; then # x11
-		printf "$*" | xclip
-	elif command -v "wl-copy" &> /dev/null; then # wayland
-		printf "$*" | wl-copy
-	elif command -v "clip" &> /dev/null; then # windows
-		printf "$*" | clip
+	local cmd
+	case "$(uname -s)" in
+	Darwin)
+		cmd=pbcopy
+		;;
+	Linux)
+		case "${XDG_SESSION_TYPE:-}" in
+		x11)
+			cmd=xclip
+			;;
+		wayland)
+			cmd=wl-copy
+			;;
+		esac
+		;;
+	*)
+		cmd=clip
+		;;
+	esac
+
+	if [[ -n "$cmd" ]] && command -v "$cmd" &>/dev/null; then
+		printf '%s' "$*" | $cmd
 	else
-		printf "[Error] $this: No command available.\n" >&2
-		return 1
+		# use OSC 52 escape sequence
+		local b64="$(printf '%s' "$*" | base64 -w 0)"
+		if [[ -n "$TMUX" ]]; then
+			printf '\ePtmux;\e\e]52;c;%s\a\e\\' "$b64"
+		else
+			printf '\e]52;c;%s\a' "$b64"
+		fi
 	fi
 }
 
