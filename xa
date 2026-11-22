@@ -12,7 +12,6 @@ _main() (
 
 	if [[ $# = 0 || "$1" = "--help" || "$1" = "-h" ]]; then
 		cat <<- EOF
-		$this
 		Extracts an archive.
 
 		Usage:
@@ -24,15 +23,15 @@ _main() (
 
 	local src="$1"
 	if [[ ! -e "$src" ]]; then
-		printf "[Error] No such file as '%s'.\n" "$src" >&2
+		printf "[Error] $this: No such file as '%s'.\n" "$src" >&2
 		return 1
 	fi
 	if [[ ! -f "$src" ]]; then
-		printf "[Error] Invalid file: '%s'.\n" "$src" >&2
+		printf "[Error] $this: Invalid file: '%s'.\n" "$src" >&2
 		return 1
 	fi
 	if [[ ! "$src" =~ ^(.*[^/])(\.(zip|7z|rar|tar\.t?(gz|xz|bz2?)))$ ]]; then
-		printf "[Error] Unsupported file: '%s'.\n" "$src" >&2
+		printf "[Error] $this: Unsupported file: '%s'.\n" "$src" >&2
 		return 1
 	fi
 	local ext="${BASH_REMATCH[3]}"
@@ -41,7 +40,7 @@ _main() (
 
 	# create tempdir ('X's are replaced with random chars)
 	local temp; temp="$(mktemp -d "$dst_dir/.extract_XXXXXXXXXX")" || {
-		printf "[Error] Failed to create temporary directory.\n" >&2
+		printf "[Error] $this: Failed to create temporary directory.\n" >&2
 		return 1
 	}
 
@@ -56,7 +55,7 @@ _main() (
 		rar)   unrar x "$src" "$temp" ;;
 		7z)    7z x "$src" -o"$temp" ;;
 	esac; then
-		printf "[Error] Failed to extract '%s'.\n" "$src" >&2
+		printf "[Error] $this: Failed to extract '%s'.\n" "$src" >&2
 		return 1
 	fi
 	local result="$temp"
@@ -82,7 +81,7 @@ _main() (
 				case "$answer" in
 				[Dd])
 					if ! rm -rf -- "$dst"; then
-						printf "[Error] Failed to delete '%s'.\n" "$dst" >&2
+						printf "[Error] $this: Failed to delete '%s'.\n" "$dst" >&2
 						return 1
 					fi
 					printf "Deleted '%s'.\n" "$dst"
@@ -101,12 +100,12 @@ _main() (
 					;;
 				esac
 			else
-				printf "[Error] Destination already exists (non-directory): '%s'.\n" "$dst" >&2
+				printf "[Error] $this: Destination already exists (non-directory): '%s'.\n" "$dst" >&2
 				return 1
 			fi
 
 		elif [[ -L "$dst" ]]; then
-			printf "[Error] Destination already exists (deadlink): '%s'.\n" "$dst" >&2
+			printf "[Error] $this: Destination already exists (deadlink): '%s'.\n" "$dst" >&2
 			return 1
 
 		else
@@ -116,12 +115,12 @@ _main() (
 
 	if $merge; then
 		rsync -a -- "$result/" "$dst" || {
-			printf "[Error] Failed to merge the result into '%s'.\n" "$dst" >&2
+			printf "[Error] $this: Failed to merge the result into '%s'.\n" "$dst" >&2
 			return 1
 		}
 	else
 		mv -- "$result" "$dst" || {
-			printf "[Error] Failed to move the result to '%s'.\n" "$dst" >&2
+			printf "[Error] $this: Failed to move the result to '%s'.\n" "$dst" >&2
 			return 1
 		}
 	fi
@@ -136,7 +135,7 @@ _main() (
 		case "$answer" in
 		[Yy])
 			"$this_dir/cb" "$dst" || {
-				printf "[Error] Failed to copy '%s' to clipboard.\n" "'$dst'" >&2
+				printf "[Error] $this: Failed to copy '%s' to clipboard.\n" "'$dst'" >&2
 				return 1
 			}
 			printf "Copied '%s' to clipboard.\n" "$dst"
