@@ -6,7 +6,7 @@
 
 _main() {
 	local this="${BASH_SOURCE[0]##*/}"
-	if [ $# -eq 0 ] || [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+	if [[ $# -eq 0 || "$1" = "--help" || "$1" = "-h" ]]; then
 		cat <<- EOF
 		Copies a string to clipboard.
 
