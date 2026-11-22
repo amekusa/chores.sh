@@ -5,26 +5,27 @@
 #
 
 _main() {
+	local this="${BASH_SOURCE[0]##*/}"
 	if [ $# -eq 0 ] || [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
-		local exec="$(basename $0)"
 		cat <<- EOF
-		$exec
 		Copies a string to clipboard.
 
 		Usage:
-		  $exec <string>
+		  $this <string>
 
 		EOF
 		return 1
 	fi
-	if command -v "pbcopy" &> /dev/null; then
+	if command -v "pbcopy" &> /dev/null; then # mac
 		printf "$*" | pbcopy
-	elif command -v "xclip" &> /dev/null; then
-		printf "$*" | xclip -selection clipboard
-	elif command -v "clip" &> /dev/null; then
+	elif command -v "xclip" &> /dev/null; then # x11
+		printf "$*" | xclip
+	elif command -v "wl-copy" &> /dev/null; then # wayland
+		printf "$*" | wl-copy
+	elif command -v "clip" &> /dev/null; then # windows
 		printf "$*" | clip
 	else
-		printf "[Error] No command available.\n" >&2
+		printf "[Error] $this: No command available.\n" >&2
 		return 1
 	fi
 }
